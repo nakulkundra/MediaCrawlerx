@@ -1,0 +1,56 @@
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 relakkes@gmail.com
+#
+# This file is part of MediaCrawler project.
+# Repository: https://github.com/NanmiCoder/MediaCrawler/blob/main/database/db.py
+# GitHub: https://github.com/NanmiCoder
+# Licensed under NON-COMMERCIAL LEARNING LICENSE 1.1
+#
+# Disclaimer: This code is for educational and research purposes only. Users must adhere to the following principles:
+# 1. Do not use for any commercial purposes.
+# 2. Comply with the target platform's Terms of Service and robots.txt rules during use.
+# 3. Do not conduct large-scale scraping or cause operational disruptions to the platform.
+# 4. Reasonably control request frequencies to avoid placing unnecessary burdens on target platforms.
+# 5. Do not use for any illegal or inappropriate purposes.
+#
+# For detailed license terms, please refer to the LICENSE file in the project root directory.
+# Using this code indicates that you agree to abide by the above principles and all terms in LICENSE.
+
+# persist-1<persist1@126.com>
+# Reason: Refactored db.py into a module, removed direct execution entry point, fixed relative import issues.
+# Side effects: None
+# Rollback strategy: Restore this file.
+import asyncio
+import sys
+from pathlib import Path
+
+# Add project root to sys.path
+project_root = Path(__file__).resolve().parents[1]
+if str(project_root) not in sys.path:
+    sys.path.append(str(project_root))
+
+from tools import utils
+from database.db_session import create_tables
+
+
+async def init_table_schema(db_type: str):
+    """
+    Initializes the database table schema.
+    This will create tables based on the ORM models.
+    Args:
+        db_type: The type of database, 'sqlite' or 'mysql'.
+    """
+    utils.logger.info(f"[init_table_schema] begin init {db_type} table schema ...")
+    await create_tables(db_type)
+    utils.logger.info(f"[init_table_schema] {db_type} table schema init successful")
+
+
+async def init_db(db_type: str = None):
+    await init_table_schema(db_type)
+
+
+async def close():
+    """
+    Placeholder for closing database connections if needed in the future.
+    """
+    pass

@@ -1,0 +1,75 @@
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 relakkes@gmail.com
+#
+# This file is part of MediaCrawler project.
+# Repository: https://github.com/NanmiCoder/MediaCrawler
+# GitHub: https://github.com/NanmiCoder
+# Licensed under NON-COMMERCIAL LEARNING LICENSE 1.1
+#
+# Disclaimer: This code is for educational and research purposes only. Users must adhere to the following principles:
+# 1. Do not use for any commercial purposes.
+# 2. Comply with the target platform's Terms of Service and robots.txt rules during use.
+# 3. Do not conduct large-scale scraping or cause operational disruptions to the platform.
+# 4. Reasonably control request frequencies to avoid placing unnecessary burdens on target platforms.
+# 5. Do not use for any illegal or inappropriate purposes.
+#
+# For detailed license terms, please refer to the LICENSE file in the project root directory.
+# Using this code indicates that you agree to abide by the above principles and all terms in LICENSE.
+
+# -*- coding: utf-8 -*-
+# @Author  : relakkes@gmail.com
+# @Time    : 2025/11/25
+# @Desc    : Auto-refresh proxy Mixin class for use by various platform clients
+
+from typing import TYPE_CHECKING, Optional
+
+from tools import utils
+
+if TYPE_CHECKING:
+    from proxy.proxy_ip_pool import ProxyIpPool
+
+
+class ProxyRefreshMixin:
+    """
+    Auto-refresh proxy Mixin class
+
+    Usage:
+    1. Let client class inherit this Mixin
+    2. Call init_proxy_pool(proxy_ip_pool) in client's __init__
+    3. Call await _refresh_proxy_if_expired() before each request method call
+
+    Requirements:
+    - client class must have self.proxy attribute to store current proxy URL
+    """
+
+    _proxy_ip_pool: Optional["ProxyIpPool"] = None
+
+    def init_proxy_pool(self, proxy_ip_pool: Optional["ProxyIpPool"]) -> None:
+        """
+        Initialize proxy pool reference
+        Args:
+            proxy_ip_pool: Proxy IP pool instance
+        """
+        self._proxy_ip_pool = proxy_ip_pool
+
+    async def _refresh_proxy_if_expired(self) -> None:
+        """
+        Check if proxy has expired, automatically refresh if so
+        Call this method before each request to ensure proxy is valid
+        """
+        if self._proxy_ip_pool is None:
+            return
+
+        if self._proxy_ip_pool.is_current_proxy_expired():
+            utils.logger.info(
+                f"[{self.__class__.__name__}._refresh_proxy_if_expired] Proxy expired, refreshing..."
+            )
+            new_proxy = await self._proxy_ip_pool.get_or_refresh_proxy()
+            # Update httpx proxy URL
+            if new_proxy.user and new_proxy.password:
+                self.proxy = f"http://{new_proxy.user}:{new_proxy.password}@{new_proxy.ip}:{new_proxy.port}"
+            else:
+                self.proxy = f"http://{new_proxy.ip}:{new_proxy.port}"
+            utils.logger.info(
+                f"[{self.__class__.__name__}._refresh_proxy_if_expired] New proxy: {new_proxy.ip}:{new_proxy.port}"
+            )

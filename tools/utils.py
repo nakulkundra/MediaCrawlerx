@@ -1,0 +1,54 @@
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 relakkes@gmail.com
+#
+# This file is part of MediaCrawler project.
+# Repository: https://github.com/NanmiCoder/MediaCrawler/blob/main/tools/utils.py
+# GitHub: https://github.com/NanmiCoder
+# Licensed under NON-COMMERCIAL LEARNING LICENSE 1.1
+#
+# Disclaimer: This code is for educational and research purposes only. Users must adhere to the following principles:
+# 1. Do not use for any commercial purposes.
+# 2. Comply with the target platform's Terms of Service and robots.txt rules during use.
+# 3. Do not conduct large-scale scraping or cause operational disruptions to the platform.
+# 4. Reasonably control request frequencies to avoid placing unnecessary burdens on target platforms.
+# 5. Do not use for any illegal or inappropriate purposes.
+#
+# For detailed license terms, please refer to the LICENSE file in the project root directory.
+# Using this code indicates that you agree to abide by the above principles and all terms in LICENSE.
+
+import argparse
+import logging
+
+from .crawler_util import *
+from .slider_util import *
+from .time_util import *
+
+
+def init_logging_config():
+    level = logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s %(name)s %(levelname)s (%(filename)s:%(lineno)d) - %(message)s",
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    _logger = logging.getLogger("MediaCrawler")
+    _logger.setLevel(level)
+
+    # Disable httpx INFO level logs
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
+    return _logger
+
+
+logger = init_logging_config()
+
+
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')

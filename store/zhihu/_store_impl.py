@@ -1,0 +1,250 @@
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 relakkes@gmail.com
+#
+# This file is part of MediaCrawler project.
+# Repository: https://github.com/NanmiCoder/MediaCrawler/blob/main/store/zhihu/_store_impl.py
+# GitHub: https://github.com/NanmiCoder
+# Licensed under NON-COMMERCIAL LEARNING LICENSE 1.1
+#
+
+# Disclaimer: This code is for learning and research purposes only. Users should comply with the following principles:
+# 1. Do not use for any commercial purposes.
+# 2. Comply with the target platform's terms of service and robots.txt rules when using.
+# 3. Do not conduct large-scale scraping or cause operational disruption to the platform.
+# 4. Request frequency should be reasonably controlled to avoid placing unnecessary burden on the target platform.
+# 5. Do not use for any illegal or improper purposes.
+#
+# For detailed license terms, please refer to the LICENSE file in the project root directory.
+# Using this code indicates that you agree to abide by the above principles and all terms in the LICENSE.
+
+
+# -*- coding: utf-8 -*-
+# @Author  : persist1@126.com
+# @Time    : 2025/9/5 19:34
+# @Desc    : Zhihu storage implementation class
+import asyncio
+import csv
+import json
+import os
+import pathlib
+from typing import Dict
+
+import aiofiles
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+import config
+from base.base_crawler import AbstractStore
+from database.db_session import get_session
+from database.models import ZhihuContent, ZhihuComment
+from tools import utils, words
+from var import crawler_type_var
+from tools.async_file_writer import AsyncFileWriter
+from database.mongodb_store_base import MongoDBStoreBase
+
+def calculate_number_of_files(file_store_path: str) -> int:
+    """Calculate the prefix sorting number for data save files, supporting writing to different files for each run
+    Args:
+        file_store_path:
+    Returns:
+        file nums
+    """
+    if not os.path.exists(file_store_path):
+        return 1
+    try:
+        return max([int(file_name.split("_")[0]) for file_name in os.listdir(file_store_path)]) + 1
+    except ValueError:
+        return 1
+
+
+class ZhihuCsvStoreImplement(AbstractStore):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.writer = AsyncFileWriter(platform="zhihu", crawler_type=crawler_type_var.get())
+
+    async def store_content(self, content_item: Dict):
+        """
+        Zhihu content CSV storage implementation
+        Args:
+            content_item: note item dict
+
+        Returns:
+
+        """
+        await self.writer.write_to_csv(item_type="contents", item=content_item)
+
+    async def store_comment(self, comment_item: Dict):
+        """
+        Zhihu comment CSV storage implementation
+        Args:
+            comment_item: comment item dict
+
+        Returns:
+
+        """
+        await self.writer.write_to_csv(item_type="comments", item=comment_item)
+
+    async def store_creator(self, creator: Dict):
+        """Creator profile is no longer persisted (teaching version: anti-harassment)."""
+        pass
+
+
+class ZhihuDbStoreImplement(AbstractStore):
+    async def store_content(self, content_item: Dict):
+        """
+        Zhihu content DB storage implementation
+        Args:
+            content_item: content item dict
+        """
+        content_id = content_item.get("content_id")
+        async with get_session() as session:
+            stmt = select(ZhihuContent).where(ZhihuContent.content_id == content_id)
+            result = await session.execute(stmt)
+            existing_content = result.scalars().first()
+            if existing_content:
+                for key, value in content_item.items():
+                    if hasattr(existing_content, key):
+                        setattr(existing_content, key, value)
+            else:
+                if "add_ts" not in content_item:
+                    content_item["add_ts"] = utils.get_current_timestamp()
+                new_content = ZhihuContent(**content_item)
+                session.add(new_content)
+            await session.commit()
+
+    async def store_comment(self, comment_item: Dict):
+        """
+        Zhihu content DB storage implementation
+        Args:
+            comment_item: comment item dict
+        """
+        comment_id = comment_item.get("comment_id")
+        async with get_session() as session:
+            stmt = select(ZhihuComment).where(ZhihuComment.comment_id == comment_id)
+            result = await session.execute(stmt)
+            existing_comment = result.scalars().first()
+            if existing_comment:
+                for key, value in comment_item.items():
+                    if hasattr(existing_comment, key):
+                        setattr(existing_comment, key, value)
+            else:
+                if "add_ts" not in comment_item:
+                    comment_item["add_ts"] = utils.get_current_timestamp()
+                new_comment = ZhihuComment(**comment_item)
+                session.add(new_comment)
+            await session.commit()
+
+    async def store_creator(self, creator: Dict):
+        """Creator profile is no longer persisted (teaching version: anti-harassment)."""
+        pass
+
+
+class ZhihuJsonStoreImplement(AbstractStore):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.writer = AsyncFileWriter(platform="zhihu", crawler_type=crawler_type_var.get())
+
+    async def store_content(self, content_item: Dict):
+        """
+        content JSON storage implementation
+        Args:
+            content_item:
+
+        Returns:
+
+        """
+        await self.writer.write_single_item_to_json(item_type="contents", item=content_item)
+
+    async def store_comment(self, comment_item: Dict):
+        """
+        comment JSON storage implementation
+        Args:
+            comment_item:
+
+        Returns:
+
+        """
+        await self.writer.write_single_item_to_json(item_type="comments", item=comment_item)
+
+    async def store_creator(self, creator: Dict):
+        """Creator profile is no longer persisted (teaching version: anti-harassment)."""
+        pass
+
+
+class ZhihuJsonlStoreImplement(AbstractStore):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.writer = AsyncFileWriter(platform="zhihu", crawler_type=crawler_type_var.get())
+
+    async def store_content(self, content_item: Dict):
+        await self.writer.write_to_jsonl(item_type="contents", item=content_item)
+
+    async def store_comment(self, comment_item: Dict):
+        await self.writer.write_to_jsonl(item_type="comments", item=comment_item)
+
+    async def store_creator(self, creator: Dict):
+        """Creator profile is no longer persisted (teaching version: anti-harassment)."""
+        pass
+
+
+class ZhihuSqliteStoreImplement(ZhihuDbStoreImplement):
+    """
+    Zhihu content SQLite storage implementation
+    """
+    pass
+
+
+class ZhihuMongoStoreImplement(AbstractStore):
+    """Zhihu MongoDB storage implementation"""
+
+    def __init__(self):
+        self.mongo_store = MongoDBStoreBase(collection_prefix="zhihu")
+
+    async def store_content(self, content_item: Dict):
+        """
+        Store content to MongoDB
+        Args:
+            content_item: Content data
+        """
+        note_id = content_item.get("note_id")
+        if not note_id:
+            return
+
+        await self.mongo_store.save_or_update(
+            collection_suffix="contents",
+            query={"note_id": note_id},
+            data=content_item
+        )
+        utils.logger.info(f"[ZhihuMongoStoreImplement.store_content] Saved note {note_id} to MongoDB")
+
+    async def store_comment(self, comment_item: Dict):
+        """
+        Store comment to MongoDB
+        Args:
+            comment_item: Comment data
+        """
+        comment_id = comment_item.get("comment_id")
+        if not comment_id:
+            return
+
+        await self.mongo_store.save_or_update(
+            collection_suffix="comments",
+            query={"comment_id": comment_id},
+            data=comment_item
+        )
+        utils.logger.info(f"[ZhihuMongoStoreImplement.store_comment] Saved comment {comment_id} to MongoDB")
+
+    async def store_creator(self, creator_item: Dict):
+        """Creator profile is no longer persisted (teaching version: anti-harassment)."""
+        pass
+
+
+class ZhihuExcelStoreImplement:
+    """Zhihu Excel storage implementation - Global singleton"""
+
+    def __new__(cls, *args, **kwargs):
+        from store.excel_store_base import ExcelStoreBase
+        return ExcelStoreBase.get_instance(
+            platform="zhihu",
+            crawler_type=crawler_type_var.get()
+        )

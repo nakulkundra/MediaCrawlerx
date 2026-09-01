@@ -1,0 +1,63 @@
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 relakkes@gmail.com
+#
+# This file is part of MediaCrawler project.
+# Repository: https://github.com/NanmiCoder/MediaCrawler/blob/main/api/routers/crawler.py
+# GitHub: https://github.com/NanmiCoder
+# Licensed under NON-COMMERCIAL LEARNING LICENSE 1.1
+#
+# Disclaimer: This code is for learning and research purposes only. Users should comply with the following principles:
+# 1. Do not use for any commercial purposes.
+# 2. Comply with the target platform's terms of service and robots.txt rules when using.
+# 3. Do not conduct large-scale scraping or cause operational disruption to the platform.
+# 4. Request frequency should be reasonably controlled to avoid placing unnecessary burden on the target platform.
+# 5. Do not use for any illegal or improper purposes.
+#
+# For detailed license terms, please refer to the LICENSE file in the project root directory.
+# Using this code indicates that you agree to abide by the above principles and all terms in the LICENSE.
+
+from fastapi import APIRouter, HTTPException
+
+from ..schemas import CrawlerStartRequest, CrawlerStatusResponse
+from ..services import crawler_manager
+
+router = APIRouter(prefix="/crawler", tags=["crawler"])
+
+
+@router.post("/start")
+async def start_crawler(request: CrawlerStartRequest):
+    """Start crawler task"""
+    success = await crawler_manager.start(request)
+    if not success:
+        # Handle concurrent/duplicate requests: if process is already running, return 400 instead of 500
+        if crawler_manager.process and crawler_manager.process.poll() is None:
+            raise HTTPException(status_code=400, detail="Crawler is already running")
+        raise HTTPException(status_code=500, detail="Failed to start crawler")
+
+    return {"status": "ok", "message": "Crawler started successfully"}
+
+
+@router.post("/stop")
+async def stop_crawler():
+    """Stop crawler task"""
+    success = await crawler_manager.stop()
+    if not success:
+        # Handle concurrent/duplicate requests: if process already exited/doesn't exist, return 400 instead of 500
+        if not crawler_manager.process or crawler_manager.process.poll() is not None:
+            raise HTTPException(status_code=400, detail="No crawler is running")
+        raise HTTPException(status_code=500, detail="Failed to stop crawler")
+
+    return {"status": "ok", "message": "Crawler stopped successfully"}
+
+
+@router.get("/status", response_model=CrawlerStatusResponse)
+async def get_crawler_status():
+    """Get crawler status"""
+    return crawler_manager.get_status()
+
+
+@router.get("/logs")
+async def get_logs(limit: int = 100):
+    """Get recent logs"""
+    logs = crawler_manager.logs[-limit:] if limit > 0 else crawler_manager.logs
+    return {"logs": [log.model_dump() for log in logs]}
